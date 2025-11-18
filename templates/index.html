@@ -18,7 +18,14 @@
     </nav>
 
     <main class="container">
-        <section class="search-section">
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="general">General Search</button>
+            <button class="tab-btn" data-tab="date">Search by Date</button>
+        </div>
+
+        <!-- General Search Tab -->
+        <section class="search-section tab-content active" id="general-tab">
             <h2>Search FDI News in Latin America</h2>
             <div class="search-box">
                 <input 
@@ -37,6 +44,31 @@
                 >
                 <button id="searchBtn" class="btn btn-primary">Search News</button>
             </div>
+        </section>
+
+        <!-- Date Search Tab -->
+        <section class="search-section tab-content" id="date-tab">
+            <h2>Search FDI News by Specific Date</h2>
+            <div class="search-box date-search-box">
+                <div class="date-input-group">
+                    <label for="dateInput">Select Date:</label>
+                    <input 
+                        type="date" 
+                        id="dateInput" 
+                        max=""
+                    >
+                </div>
+                <input 
+                    type="number" 
+                    id="dateNumResults" 
+                    placeholder="Number of results" 
+                    value="10"
+                    min="1"
+                    max="50"
+                >
+                <button id="dateSearchBtn" class="btn btn-primary">Search by Date</button>
+            </div>
+            <p class="date-help-text">Find FDI news articles published on a specific date in Latin America</p>
         </section>
 
         <section class="stats-section">

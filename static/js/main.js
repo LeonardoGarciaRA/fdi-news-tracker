@@ -11,6 +11,16 @@ const loading = document.getElementById('loading');
 const totalNews = document.getElementById('totalNews');
 const lastUpdate = document.getElementById('lastUpdate');
 
+// Date search elements
+const dateSearchBtn = document.getElementById('dateSearchBtn');
+const dateInput = document.getElementById('dateInput');
+const dateNumResults = document.getElementById('dateNumResults');
+const tabButtons = document.querySelectorAll('.tab-btn');
+const tabContents = document.querySelectorAll('.tab-content');
+
+// Set max date to today
+dateInput.max = new Date().toISOString().split('T')[0];
+
 // Search for news
 searchBtn.addEventListener('click', async () => {
     const query = searchInput.value.trim();
@@ -111,6 +121,7 @@ function displayNews(news) {
             <div class="meta">
                 <span>Source: ${escapeHtml(item.source || 'Unknown')}</span>
                 ${item.published ? `<span>Published: ${item.published}</span>` : ''}
+                ${item.search_date ? `<span>Search Date: ${item.search_date}</span>` : ''}
                 ${item.collected_at ? `<span>Collected: ${item.collected_at}</span>` : ''}
             </div>
             <div class="summary">
@@ -155,6 +166,76 @@ function escapeHtml(text) {
     div.textContent = text;
     return div.innerHTML;
 }
+
+// Tab switching functionality
+tabButtons.forEach(button => {
+    button.addEventListener('click', () => {
+        const tabName = button.getAttribute('data-tab');
+        
+        // Remove active class from all tabs and contents
+        tabButtons.forEach(btn => btn.classList.remove('active'));
+        tabContents.forEach(content => content.classList.remove('active'));
+        
+        // Add active class to clicked tab and corresponding content
+        button.classList.add('active');
+        document.getElementById(`${tabName}-tab`).classList.add('active');
+    });
+});
+
+// Date-based search
+dateSearchBtn.addEventListener('click', async () => {
+    const selectedDate = dateInput.value;
+    const num = parseInt(dateNumResults.value) || 10;
+    
+    if (!selectedDate) {
+        alert('Please select a date');
+        return;
+    }
+    
+    // Check if date is in the future
+    const today = new Date().toISOString().split('T')[0];
+    if (selectedDate > today) {
+        alert('Please select a date that is not in the future');
+        return;
+    }
+    
+    loading.classList.remove('hidden');
+    newsContainer.innerHTML = '';
+    
+    try {
+        const response = await fetch('/api/search/date', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                date: selectedDate,
+                num_results: num
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            allNews = [...allNews, ...data.news];
+            displayNews(allNews);
+            updateStats();
+            
+            // Show success message
+            if (data.count > 0) {
+                alert(`Found ${data.count} articles for ${selectedDate}`);
+            } else {
+                alert(`No articles found for ${selectedDate}. Try a different date.`);
+            }
+        } else {
+            alert('Error: ' + data.error);
+        }
+    } catch (error) {
+        alert('Error searching for news: ' + error.message);
+    } finally {
+        loading.classList.add('hidden');
+    }
+});
 
 // Load news on page load
 loadNews();

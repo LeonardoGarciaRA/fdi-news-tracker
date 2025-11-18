@@ -1,5 +1,5 @@
 from flask import Flask, render_template, jsonify, request, send_file
-from news_scraper import search_fdi_news
+from news_scraper import search_fdi_news, search_fdi_news_by_date
 from summarizer import summarize_article
 from excel_export import export_to_excel
 import os
@@ -69,6 +69,48 @@ def export_excel():
             download_name=f'fdi_projects_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx',
             mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/search/date', methods=['POST'])
+def search_news_by_date():
+    """Search for FDI news in Latin America for a specific date"""
+    try:
+        data = request.json
+        search_date = data.get('date', None)  # Format: YYYY-MM-DD
+        num_results = data.get('num_results', 10)
+        
+        if not search_date:
+            return jsonify({
+                'success': False,
+                'error': 'Date is required'
+            }), 400
+        
+        # Search for news on specific date
+        news_items = search_fdi_news_by_date(search_date, num_results)
+        
+        # Summarize each article
+        for item in news_items:
+            if 'summary' not in item or not item['summary']:
+                item['summary'] = summarize_article(item.get('url', ''))
+        
+        # Add timestamp
+        for item in news_items:
+            item['collected_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            item['search_date'] = search_date
+        
+        # Store in memory
+        collected_news.extend(news_items)
+        
+        return jsonify({
+            'success': True,
+            'news': news_items,
+            'count': len(news_items),
+            'search_date': search_date
+        })
     except Exception as e:
         return jsonify({
             'success': False,
