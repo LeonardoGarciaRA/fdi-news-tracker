@@ -1,11 +1,7 @@
 flask==3.0.0
 requests==2.31.0
 beautifulsoup4==4.12.2
-<<<<<<< HEAD
 pandas==2.2.2
-=======
-pandas==2.1.3
->>>>>>> a537be1bd84c6863024885b0c1e08f891beb7f15
 openpyxl==3.1.2
 newspaper3k==0.2.8
 nltk==3.8.1
@@ -13,4 +9,3 @@ feedparser==6.0.10
 googlesearch-python==1.2.3
 gunicorn==21.2.0
 lxml_html_clean==0.4.3
-
