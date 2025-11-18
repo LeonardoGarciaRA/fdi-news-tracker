@@ -21,7 +21,7 @@ def search_news():
     try:
         data = request.json
         query = data.get('query', 'FDI projects Latin America')
-        num_results = data.get('num_results', 10)
+        num_results = data.get('num_results', 20)  # Default to 20 for pagination
         
         # Search for news
         news_items = search_fdi_news(query, num_results)
@@ -51,12 +51,55 @@ def search_news():
 
 @app.route('/api/news', methods=['GET'])
 def get_news():
-    """Get all collected news"""
+    """Get all collected news with pagination"""
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int)
+    
+    # Calculate pagination
+    total = len(collected_news)
+    start = (page - 1) * per_page
+    end = start + per_page
+    paginated_news = collected_news[start:end]
+    
     return jsonify({
         'success': True,
-        'news': collected_news,
-        'count': len(collected_news)
+        'news': paginated_news,
+        'count': len(paginated_news),
+        'total': total,
+        'page': page,
+        'per_page': per_page,
+        'total_pages': (total + per_page - 1) // per_page
     })
+
+@app.route('/api/news/latest', methods=['GET'])
+def get_latest_news():
+    """Automatically fetch latest FDI news"""
+    try:
+        # Search for latest news (last 7 days)
+        news_items = search_fdi_news("FDI foreign direct investment Latin America", 20)
+        
+        # Summarize each article
+        for item in news_items:
+            if 'summary' not in item or not item['summary']:
+                item['summary'] = summarize_article(item.get('url', ''))
+        
+        # Add timestamp
+        for item in news_items:
+            item['collected_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        # Store in memory
+        collected_news.extend(news_items)
+        
+        return jsonify({
+            'success': True,
+            'news': news_items,
+            'count': len(news_items)
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 @app.route('/api/export', methods=['GET'])
 def export_excel():

@@ -297,6 +297,30 @@ body {
     font-size: 1.1rem;
 }
 
+/* Pagination */
+.pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 2rem;
+    padding: 1rem;
+}
+
+.page-info {
+    font-weight: 600;
+    color: var(--text);
+}
+
+.pagination .btn {
+    min-width: 100px;
+}
+
+.pagination .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 footer {
     text-align: center;
     padding: 2rem;

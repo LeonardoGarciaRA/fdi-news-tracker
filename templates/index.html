@@ -34,14 +34,6 @@
                     placeholder="Search for FDI projects (e.g., 'FDI Brazil manufacturing')"
                     value="FDI projects Latin America"
                 >
-                <input 
-                    type="number" 
-                    id="numResults" 
-                    placeholder="Number of results" 
-                    value="10"
-                    min="1"
-                    max="50"
-                >
                 <button id="searchBtn" class="btn btn-primary">Search News</button>
             </div>
         </section>
@@ -58,14 +50,6 @@
                         max=""
                     >
                 </div>
-                <input 
-                    type="number" 
-                    id="dateNumResults" 
-                    placeholder="Number of results" 
-                    value="10"
-                    min="1"
-                    max="50"
-                >
                 <button id="dateSearchBtn" class="btn btn-primary">Search by Date</button>
             </div>
             <p class="date-help-text">Find FDI news articles published on a specific date in Latin America</p>
@@ -83,10 +67,16 @@
         </section>
 
         <section class="news-section">
-            <h2>Collected News</h2>
-            <div id="loading" class="loading hidden">Searching for news...</div>
+            <h2>Latest FDI News in Latin America</h2>
+            <div id="loading" class="loading hidden">Loading latest news...</div>
             <div id="newsContainer" class="news-container">
-                <p class="empty-state">No news collected yet. Click "Search News" to start.</p>
+                <p class="empty-state">Loading latest FDI news...</p>
+            </div>
+            <!-- Pagination -->
+            <div id="pagination" class="pagination hidden">
+                <button id="prevPage" class="btn btn-secondary">Previous</button>
+                <span id="pageInfo" class="page-info">Page 1 of 1</span>
+                <button id="nextPage" class="btn btn-secondary">Next</button>
             </div>
         </section>
     </main>
