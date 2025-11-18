@@ -2,9 +2,9 @@ services:
   - type: web
     name: fdi-news-tracker
     env: python
-    buildCommand: pip install -r requirements.txt
+    pythonVersion: "3.12.0"
+    buildCommand: pip install -r requirements.txt && python setup_nltk.py
     startCommand: gunicorn app:app
     envVars:
       - key: PYTHON_VERSION
-        value: 3.11.0
-
+        value: 3.12.0
