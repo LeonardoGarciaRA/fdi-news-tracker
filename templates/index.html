@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FDI Projects Tracker - Latin America</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <h1 class="logo">FDI Projects Tracker</h1>
+            <div class="nav-actions">
+                <button id="exportBtn" class="btn btn-secondary">Export to Excel</button>
+                <button id="clearBtn" class="btn btn-danger">Clear All</button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container">
+        <section class="search-section">
+            <h2>Search FDI News in Latin America</h2>
+            <div class="search-box">
+                <input 
+                    type="text" 
+                    id="searchInput" 
+                    placeholder="Search for FDI projects (e.g., 'FDI Brazil manufacturing')"
+                    value="FDI projects Latin America"
+                >
+                <input 
+                    type="number" 
+                    id="numResults" 
+                    placeholder="Number of results" 
+                    value="10"
+                    min="1"
+                    max="50"
+                >
+                <button id="searchBtn" class="btn btn-primary">Search News</button>
+            </div>
+        </section>
+
+        <section class="stats-section">
+            <div class="stat-card">
+                <h3 id="totalNews">0</h3>
+                <p>Total Articles</p>
+            </div>
+            <div class="stat-card">
+                <h3 id="lastUpdate">-</h3>
+                <p>Last Update</p>
+            </div>
+        </section>
+
+        <section class="news-section">
+            <h2>Collected News</h2>
+            <div id="loading" class="loading hidden">Searching for news...</div>
+            <div id="newsContainer" class="news-container">
+                <p class="empty-state">No news collected yet. Click "Search News" to start.</p>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>&copy; 2024 FDI Projects Tracker - Latin America</p>
+    </footer>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
+
