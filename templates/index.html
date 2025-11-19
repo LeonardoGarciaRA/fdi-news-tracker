@@ -9,13 +9,34 @@
 <body>
     <nav class="navbar">
         <div class="container">
-            <h1 class="logo">FDI Projects Tracker</h1>
+            <div>
+                <p class="nav-eyebrow">Latin America FDI Monitor</p>
+                <h1 class="logo">FDI Projects Tracker</h1>
+            </div>
             <div class="nav-actions">
-                <button id="exportBtn" class="btn btn-secondary">Export to Excel</button>
-                <button id="clearBtn" class="btn btn-danger">Clear All</button>
+                <button id="exportBtn" class="btn btn-secondary">Exportar Excel</button>
+                <button id="clearBtn" class="btn btn-danger">Limpar Tudo</button>
             </div>
         </div>
     </nav>
+
+    <header class="hero">
+        <div class="container hero-grid">
+            <div>
+                <p class="hero-kicker">Monitoramento automatizado</p>
+                <h2>Notícias qualificada de IED na América Latina</h2>
+                <p>
+                    Coletamos, filtramos e resumimos os anúncios de investimentos estrangeiros diretos com apoio de IA, para que
+                    você acompanhe os projetos mais relevantes em segundos.
+                </p>
+            </div>
+            <ul class="hero-list">
+                <li>Filtros inteligentes por país, setor e score de relevância</li>
+                <li>Resumos em linguagem natural gerados por IA</li>
+                <li>Exportação rápida dos dados e linha do tempo sempre atualizada</li>
+            </ul>
+        </div>
+    </header>
 
     <main class="container">
         <!-- Tabs -->
@@ -57,13 +78,51 @@
 
         <section class="stats-section">
             <div class="stat-card">
+                <p class="stat-label">Total coletado</p>
                 <h3 id="totalNews">0</h3>
-                <p>Total Articles</p>
             </div>
             <div class="stat-card">
-                <h3 id="lastUpdate">-</h3>
-                <p>Last Update</p>
+                <p class="stat-label">Visíveis após filtros</p>
+                <h3 id="visibleNews">0</h3>
             </div>
+            <div class="stat-card">
+                <p class="stat-label">Última atualização</p>
+                <h3 id="lastUpdate">-</h3>
+            </div>
+        </section>
+
+        <section class="filter-panel">
+            <div class="filter-header">
+                <div>
+                    <h3>Refine os resultados</h3>
+                    <p>Combine filtros para destacar apenas os anúncios mais relevantes.</p>
+                </div>
+                <button id="resetFilters" class="btn btn-secondary ghost">Limpar filtros</button>
+            </div>
+            <div class="filters-grid">
+                <label class="form-control">
+                    <span>País</span>
+                    <select id="countryFilter">
+                        <option value="all">Todos</option>
+                    </select>
+                </label>
+                <label class="form-control">
+                    <span>Setor</span>
+                    <select id="sectorFilter">
+                        <option value="all">Todos</option>
+                    </select>
+                </label>
+                <label class="form-control">
+                    <span>Score mínimo de relevância</span>
+                    <input type="range" id="scoreFilter" min="0" max="20" value="0">
+                    <small id="scoreValue">0</small>
+                </label>
+                <label class="form-control">
+                    <span>Buscar no texto</span>
+                    <input type="text" id="textFilter" placeholder="Ex.: hidrogênio verde, nearshoring...">
+                </label>
+            </div>
+            <div id="activeFilters" class="active-filters"></div>
         </section>
 
         <section class="news-section">

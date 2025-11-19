@@ -4,12 +4,51 @@ from summarizer import summarize_article
 from excel_export import export_to_excel
 import os
 from datetime import datetime
+from typing import List
 
 app = Flask(__name__)
 app.config['JSON_AS_ASCII'] = False
 
 # Store collected news
 collected_news = []
+
+
+def _prepare_news_items(news_items: List[dict]):
+    """Attach AI summaries and timestamps to news items."""
+    prepared = []
+    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    for item in news_items:
+        summary = item.get('summary')
+        if not summary:
+            summary = summarize_article(item.get('url', ''), item.get('content'))
+
+        enriched_item = {**item}
+        enriched_item['summary'] = summary
+        enriched_item['collected_at'] = now
+        prepared.append(enriched_item)
+    return prepared
+
+
+def _merge_news_items(news_items: List[dict]):
+    """Merge unique news items into the in-memory collection."""
+    global collected_news
+    existing_urls = {item['url']: index for index, item in enumerate(collected_news)}
+    fresh_items = []
+
+    for item in news_items:
+        url = item.get('url')
+        if not url:
+            continue
+        if url in existing_urls:
+            # Update metadata for existing entries (summary, relevance, etc.)
+            collected_news[existing_urls[url]].update(item)
+        else:
+            fresh_items.append(item)
+
+    if fresh_items:
+        collected_news = fresh_items + collected_news
+
+    return fresh_items
 
 @app.route('/')
 def index():
@@ -25,18 +64,9 @@ def search_news():
         
         # Search for news
         news_items = search_fdi_news(query, num_results)
-        
-        # Summarize each article
-        for item in news_items:
-            if 'summary' not in item or not item['summary']:
-                item['summary'] = summarize_article(item.get('url', ''))
-        
-        # Add timestamp
-        for item in news_items:
-            item['collected_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        
-        # Store in memory (in production, use a database)
-        collected_news.extend(news_items)
+        news_items = _prepare_news_items(news_items)
+        news_items.sort(key=lambda x: x.get('relevance_score', 0), reverse=True)
+        _merge_news_items(news_items)
         
         return jsonify({
             'success': True,
@@ -77,18 +107,9 @@ def get_latest_news():
     try:
         # Search for latest news (last 7 days)
         news_items = search_fdi_news("FDI foreign direct investment Latin America", 20)
-        
-        # Summarize each article
-        for item in news_items:
-            if 'summary' not in item or not item['summary']:
-                item['summary'] = summarize_article(item.get('url', ''))
-        
-        # Add timestamp
-        for item in news_items:
-            item['collected_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        
-        # Store in memory
-        collected_news.extend(news_items)
+        news_items = _prepare_news_items(news_items)
+        news_items.sort(key=lambda x: x.get('relevance_score', 0), reverse=True)
+        _merge_news_items(news_items)
         
         return jsonify({
             'success': True,
@@ -134,19 +155,11 @@ def search_news_by_date():
         
         # Search for news on specific date
         news_items = search_fdi_news_by_date(search_date, num_results)
-        
-        # Summarize each article
+        news_items = _prepare_news_items(news_items)
         for item in news_items:
-            if 'summary' not in item or not item['summary']:
-                item['summary'] = summarize_article(item.get('url', ''))
-        
-        # Add timestamp
-        for item in news_items:
-            item['collected_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             item['search_date'] = search_date
-        
-        # Store in memory
-        collected_news.extend(news_items)
+        news_items.sort(key=lambda x: x.get('relevance_score', 0), reverse=True)
+        _merge_news_items(news_items)
         
         return jsonify({
             'success': True,

@@ -9,3 +9,6 @@ feedparser==6.0.10
 googlesearch-python==1.2.3
 gunicorn==21.2.0
 lxml_html_clean==0.4.3
+transformers==4.36.2
+torch==2.2.1
+sentencepiece==0.1.99

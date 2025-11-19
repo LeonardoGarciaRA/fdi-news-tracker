@@ -20,10 +20,12 @@ def export_to_excel(news_items, filename=None):
             'Source': item.get('source', ''),
             'Published Date': item.get('published', ''),
             'Collected At': item.get('collected_at', ''),
-            'Country': item.get('country', ''),
-            'Sector': item.get('sector', ''),
+            'Countries': ', '.join(item.get('countries', []) or ([item.get('country')] if item.get('country') else [])),
+            'Sectors': ', '.join(item.get('sectors', []) or ([item.get('sector')] if item.get('sector') else [])),
             'Investment Amount': item.get('amount', ''),
-            'Company': item.get('company', '')
+            'Company': item.get('company', ''),
+            'Relevance Score': item.get('relevance_score', ''),
+            'Origin': item.get('origin', '')
         })
     
     # Create DataFrame

@@ -1,287 +1,302 @@
-import requests
-from bs4 import BeautifulSoup
-from googlesearch import search
-import feedparser
-from newspaper import Article
+from __future__ import annotations
+
+import re
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
+from typing import Dict, List
 
-def is_fdi_latin_america_related(title, summary, text):
-    """
-    Check if article is related to FDI in Latin America
-    """
-    combined_text = f"{title} {summary} {text}".lower()
-    
-    # Must contain FDI-related terms
-    fdi_keywords = [
-        'fdi', 'foreign direct investment', 'inversión extranjera',
-        'foreign investment', 'direct investment', 'investment project',
-        'capital investment', 'multinational', 'cross-border investment'
-    ]
-    
-    # Must contain Latin America country or region
-    latin_america_keywords = [
-        'latin america', 'américa latina', 'south america', 'américa del sur',
-        'argentina', 'brazil', 'brasil', 'chile', 'colombia', 'mexico', 'méxico',
-        'peru', 'perú', 'ecuador', 'uruguay', 'paraguay', 'bolivia', 'venezuela',
-        'costa rica', 'panama', 'panamá', 'guatemala', 'honduras', 'nicaragua',
-        'el salvador', 'dominican republic', 'republica dominicana'
-    ]
-    
-    # Exclude non-Latin America regions
-    exclude_keywords = [
-        'mozambique', 'africa', 'asia', 'europe', 'middle east',
-        'china', 'india', 'japan', 'korea', 'australia'
-    ]
-    
-    has_fdi = any(keyword in combined_text for keyword in fdi_keywords)
-    has_latin_america = any(keyword in combined_text for keyword in latin_america_keywords)
-    has_exclude = any(keyword in combined_text for keyword in exclude_keywords)
-    
-    # Must have FDI term AND Latin America reference, AND not have exclude terms
-    return has_fdi and has_latin_america and not has_exclude
+import feedparser
+from googlesearch import search
+from newspaper import Article
 
-def search_fdi_news(query="FDI projects Latin America", num_results=20):
-    """
-    Search for FDI news using multiple sources - focused on Latin America
-    """
+LATAM_COUNTRIES = [
+    'Argentina', 'Bolivia', 'Brazil', 'Chile', 'Colombia', 'Costa Rica', 'Cuba',
+    'Dominican Republic', 'Ecuador', 'El Salvador', 'Guatemala', 'Honduras',
+    'Mexico', 'Nicaragua', 'Panama', 'Paraguay', 'Peru', 'Uruguay', 'Venezuela'
+]
+
+SECTOR_KEYWORDS = {
+    'Energy': ['energy', 'renewable', 'solar', 'wind', 'hydro'],
+    'Manufacturing': ['plant', 'factory', 'manufacturing', 'assembly'],
+    'Technology': ['technology', 'software', 'data center', 'ai', 'cloud'],
+    'Infrastructure': ['port', 'rail', 'infrastructure', 'airport'],
+    'Finance': ['bank', 'financial', 'fintech', 'investment fund'],
+    'Mining': ['mining', 'copper', 'lithium', 'extractive'],
+}
+
+FDI_CORE_KEYWORDS = [
+    'fdi', 'foreign direct investment', 'inversión extranjera',
+    'greenfield', 'capital expenditure', 'capex', 'investment project',
+    'manufacturing investment', 'plant expansion', 'factory expansion'
+]
+
+DEAL_TERMS = [
+    'investment', 'invests', 'investirá', 'announce', 'project', 'facility',
+    'expansion', 'build', 'construct', 'develop', 'partnership'
+]
+
+EXCLUDE_KEYWORDS = [
+    'middle east', 'africa', 'asia', 'europe', 'australia', 'new zealand'
+]
+
+MIN_RELEVANCE_SCORE = 6
+
+
+def clean_text(value: str) -> str:
+    return ' '.join(value.split()) if value else ''
+
+
+def score_article_relevance(title: str, summary: str, text: str) -> int:
+    combined = f"{title} {summary} {text}".lower()
+    score = 0
+
+    score += sum(3 for kw in FDI_CORE_KEYWORDS if kw in combined)
+    score += sum(2 for kw in DEAL_TERMS if kw in combined)
+    score += sum(2 for country in LATAM_COUNTRIES if country.lower() in combined)
+
+    if any(word in combined for word in EXCLUDE_KEYWORDS):
+        score -= 4
+
+    return score
+
+
+def is_fdi_latin_america_related(title: str, summary: str, text: str) -> bool:
+    return score_article_relevance(title, summary, text) >= MIN_RELEVANCE_SCORE
+
+
+def extract_fdi_details(text: str) -> Dict[str, List[str]]:
+    text = text or ''
+    lower_text = text.lower()
+
+    countries = [c for c in LATAM_COUNTRIES if c.lower() in lower_text]
+
+    sectors = []
+    for sector, keywords in SECTOR_KEYWORDS.items():
+        if any(keyword in lower_text for keyword in keywords):
+            sectors.append(sector)
+
+    amount_pattern = r'(?:US\$|\$|USD\s?)?[\d,.]+\s?(?:million|billion|m|bn|b)?'
+    amounts = re.findall(amount_pattern, text, flags=re.IGNORECASE)
+
+    company_pattern = r'([A-Z][A-Za-z0-9&\- ]{2,})(?:\s+(?:Corp|Corporation|S\.A\.|SA|Inc|LLC|Group|Holdings|S\.A\. de C\.V\.))'
+    companies = [match.strip() for match in re.findall(company_pattern, text)]
+
+    return {
+        'countries': sorted(set(countries)),
+        'sectors': sorted(set(sectors)),
+        'amount': amounts[0] if amounts else '',
+        'company': companies[0] if companies else '',
+    }
+
+
+def build_news_item(title: str, url: str, summary: str, published: str, source: str, text: str, origin: str = 'rss') -> Dict:
+    clean_summary = clean_text(summary)[:700]
+    clean_text_content = clean_text(text)
+    details = extract_fdi_details(clean_text_content or clean_summary)
+    relevance = score_article_relevance(title, summary, clean_text_content)
+
+    return {
+        'title': title,
+        'url': url,
+        'summary': clean_summary,
+        'published': published,
+        'source': source,
+        'content': clean_text_content,
+        'relevance_score': relevance,
+        'countries': details['countries'],
+        'country': details['countries'][0] if details['countries'] else '',
+        'sectors': details['sectors'],
+        'sector': details['sectors'][0] if details['sectors'] else '',
+        'amount': details['amount'],
+        'company': details['company'],
+        'origin': origin,
+    }
+
+
+def parse_article(url: str) -> Article:
+    article = Article(url)
+    article.download()
+    article.parse()
+    return article
+
+
+def search_fdi_news(query: str = "FDI projects Latin America", num_results: int = 20):
     news_items = []
-    
-    # More specific search query for Latin America FDI
-    base_query = "(FDI OR 'foreign direct investment' OR 'inversión extranjera') AND ('Latin America' OR 'América Latina' OR Argentina OR Brazil OR Chile OR Colombia OR Mexico OR Peru)"
-    
-    # Use Google News RSS feeds and web search
     urls_found = set()
-    
-    # Search Google News with more specific query
+
+    search_query = (
+        "FDI foreign direct investment Latin America Argentina Brazil Chile Colombia "
+        "Mexico Peru AND project"
+    )
+    google_news_url = (
+        f"https://news.google.com/rss/search?q={search_query.replace(' ', '+')}+when:10d&hl=en&gl=US&ceid=US:en"
+    )
+
     try:
-        # Use a more targeted query
-        search_query = "FDI foreign direct investment Latin America Argentina Brazil Chile Colombia Mexico Peru"
-        google_news_url = f"https://news.google.com/rss/search?q={search_query.replace(' ', '+')}+when:7d&hl=en&gl=US&ceid=US:en"
         feed = feedparser.parse(google_news_url)
-        
-        for entry in feed.entries[:num_results * 2]:  # Get more to filter
-            if entry.link not in urls_found:
-                entry_title = entry.title or ''
-                entry_summary = entry.get('summary', '') or ''
-                
-                # Quick filter before downloading article
-                if not is_fdi_latin_america_related(entry_title, entry_summary, ''):
-                    continue
-                
-                try:
-                    article = Article(entry.link)
-                    article.download()
-                    article.parse()
-                    
-                    article_text = article.text or ''
-                    full_text = f"{entry_title} {entry_summary} {article_text}"
-                    
-                    # Double-check with full article text
-                    if is_fdi_latin_america_related(entry_title, entry_summary, article_text):
-                        news_items.append({
-                            'title': entry.title,
-                            'url': entry.link,
-                            'summary': article.text[:500] if article.text else entry.get('summary', ''),
-                            'published': entry.get('published', ''),
-                            'source': entry.get('source', {}).get('title', 'Unknown')
-                        })
-                        urls_found.add(entry.link)
-                        if len(news_items) >= num_results:
-                            break
-                    time.sleep(1)  # Be respectful with requests
-                except:
-                    # Fallback: only include if RSS data passes filter
-                    if is_fdi_latin_america_related(entry_title, entry_summary, ''):
-                        news_items.append({
-                            'title': entry.title,
-                            'url': entry.link,
-                            'summary': entry.get('summary', '')[:500],
-                            'published': entry.get('published', ''),
-                            'source': entry.get('source', {}).get('title', 'Unknown')
-                        })
-                        urls_found.add(entry.link)
-                        if len(news_items) >= num_results:
-                            break
-    except Exception as e:
-        print(f"Error fetching Google News: {e}")
-    
-    # Additional web search as fallback - more targeted
+        for entry in feed.entries[:num_results * 3]:
+            if entry.link in urls_found:
+                continue
+
+            entry_title = entry.title or ''
+            entry_summary = entry.get('summary', '') or ''
+
+            try:
+                article = parse_article(entry.link)
+                article_text = article.text or ''
+            except Exception:
+                article = None
+                article_text = ''
+
+            if not is_fdi_latin_america_related(entry_title, entry_summary, article_text):
+                continue
+
+            news_items.append(
+                build_news_item(
+                    title=entry_title,
+                    url=entry.link,
+                    summary=article_text[:600] if article_text else entry_summary,
+                    published=entry.get('published', ''),
+                    source=entry.get('source', {}).get('title', 'Google News'),
+                    text=article_text,
+                )
+            )
+            urls_found.add(entry.link)
+            if len(news_items) >= num_results:
+                break
+            time.sleep(0.5)
+    except Exception as exc:
+        print(f"Error fetching Google News: {exc}")
+
     if len(news_items) < num_results:
         try:
-            # More specific search for Latin America FDI
-            search_query = f"FDI foreign direct investment Latin America Argentina Brazil Chile Colombia Mexico Peru site:reuters.com OR site:bloomberg.com OR site:bloomberglinea.com OR site:ft.com"
-            for url in search(search_query, num=min(20, (num_results - len(news_items)) * 2), stop=20):
-                if url not in urls_found and len(news_items) < num_results:
-                    try:
-                        article = Article(url)
-                        article.download()
-                        article.parse()
-                        
-                        article_title = article.title or ''
-                        article_text = article.text or ''
-                        
-                        # Filter to ensure it's FDI in Latin America
-                        if is_fdi_latin_america_related(article_title, article_text[:200], article_text):
-                            news_items.append({
-                                'title': article.title or 'No title',
-                                'url': url,
-                                'summary': article.text[:500] if article.text else '',
-                                'published': article.publish_date.strftime('%Y-%m-%d') if article.publish_date else '',
-                                'source': url.split('/')[2] if '/' in url else 'Unknown'
-                            })
-                            urls_found.add(url)
-                        time.sleep(1)
-                    except:
-                        pass
-        except Exception as e:
-            print(f"Error in web search: {e}")
-    
+            fallback_query = (
+                "(FDI OR 'foreign direct investment') Latin America site:reuters.com OR site:bloomberg.com "
+                "OR site:bloomberglinea.com OR site:bnamericas.com"
+            )
+            for url in search(fallback_query, num=min(25, num_results * 3), stop=25):
+                if url in urls_found:
+                    continue
+
+                try:
+                    article = parse_article(url)
+                except Exception:
+                    continue
+
+                if not is_fdi_latin_america_related(article.title or '', article.text[:300], article.text):
+                    continue
+
+                news_items.append(
+                    build_news_item(
+                        title=article.title or 'No title',
+                        url=url,
+                        summary=article.text[:600],
+                        published=article.publish_date.strftime('%Y-%m-%d') if article.publish_date else '',
+                        source=url.split('/')[2] if '/' in url else 'Unknown',
+                        text=article.text,
+                        origin='web',
+                    )
+                )
+                urls_found.add(url)
+                if len(news_items) >= num_results:
+                    break
+                time.sleep(0.5)
+        except Exception as exc:
+            print(f"Error in web search: {exc}")
+
     return news_items[:num_results]
 
-def extract_fdi_details(text):
-    """
-    Extract FDI project details from text
-    """
-    details = {
-        'country': '',
-        'sector': '',
-        'amount': '',
-        'company': ''
-    }
-    
-    # Simple keyword extraction (can be enhanced with NLP)
-    latin_american_countries = [
-        'Argentina', 'Brazil', 'Chile', 'Colombia', 'Mexico', 'Peru',
-        'Ecuador', 'Uruguay', 'Paraguay', 'Bolivia', 'Venezuela',
-        'Costa Rica', 'Panama', 'Guatemala', 'Honduras', 'Nicaragua'
-    ]
-    
-    for country in latin_american_countries:
-        if country.lower() in text.lower():
-            details['country'] = country
-            break
-    
-    return details
 
-def search_fdi_news_by_date(search_date, num_results=10):
-    """
-    Search for FDI news in Latin America for a specific date
-    search_date format: YYYY-MM-DD
-    """
+def search_fdi_news_by_date(search_date: str, num_results: int = 10):
     news_items = []
     urls_found = set()
-    
-    # Parse the date
+
     try:
         target_date = datetime.strptime(search_date, '%Y-%m-%d')
-        date_str = target_date.strftime('%Y-%m-%d')
-        # Format for Google News: YYYYMMDD
-        google_date = target_date.strftime('%Y%m%d')
     except ValueError:
-        print(f"Invalid date format: {search_date}")
         return []
-    
-    # Base query for FDI in Latin America
+
     base_query = "FDI foreign direct investment Latin America"
-    
-    # Search Google News for specific date
+    query_encoded = base_query.replace(' ', '+')
+    google_news_url = f"https://news.google.com/rss/search?q={query_encoded}&hl=en&gl=US&ceid=US:en"
+
     try:
-        # Google News RSS with date filter
-        # Note: Google News RSS date filtering is limited, so we'll search and filter
-        query_encoded = base_query.replace(' ', '+')
-        google_news_url = f"https://news.google.com/rss/search?q={query_encoded}&hl=en&gl=US&ceid=US:en"
         feed = feedparser.parse(google_news_url)
-        
-        for entry in feed.entries[:num_results * 2]:  # Get more to filter by date
-            if entry.link not in urls_found:
-                # Check if article date matches
-                entry_date_str = None
-                if hasattr(entry, 'published_parsed') and entry.published_parsed:
-                    try:
-                        entry_date = datetime(*entry.published_parsed[:6])
-                        entry_date_str = entry_date.strftime('%Y-%m-%d')
-                    except:
-                        pass
-                
-                # If date matches or we can't determine date, include it
-                if entry_date_str == date_str or entry_date_str is None:
-                    try:
-                        article = Article(entry.link)
-                        article.download()
-                        article.parse()
-                        
-                        # Double-check date from article
-                        article_date_str = None
-                        if article.publish_date:
-                            article_date_str = article.publish_date.strftime('%Y-%m-%d')
-                        
-                        # Only include if date matches
-                        if article_date_str == date_str or (entry_date_str == date_str and article_date_str is None):
-                            news_items.append({
-                                'title': entry.title,
-                                'url': entry.link,
-                                'summary': article.text[:500] if article.text else entry.get('summary', ''),
-                                'published': entry.get('published', ''),
-                                'source': entry.get('source', {}).get('title', 'Unknown'),
-                                'date': article_date_str or entry_date_str or date_str
-                            })
-                            urls_found.add(entry.link)
-                            if len(news_items) >= num_results:
-                                break
-                        time.sleep(1)
-                    except:
-                        # Fallback: include if date from RSS matches
-                        if entry_date_str == date_str:
-                            news_items.append({
-                                'title': entry.title,
-                                'url': entry.link,
-                                'summary': entry.get('summary', '')[:500],
-                                'published': entry.get('published', ''),
-                                'source': entry.get('source', {}).get('title', 'Unknown'),
-                                'date': entry_date_str or date_str
-                            })
-                            urls_found.add(entry.link)
-                            if len(news_items) >= num_results:
-                                break
-    except Exception as e:
-        print(f"Error fetching Google News by date: {e}")
-    
-    # Additional search with date in query
+        for entry in feed.entries[:num_results * 4]:
+            if entry.link in urls_found:
+                continue
+
+            entry_date_str = None
+            if hasattr(entry, 'published_parsed') and entry.published_parsed:
+                entry_date = datetime(*entry.published_parsed[:6])
+                entry_date_str = entry_date.strftime('%Y-%m-%d')
+
+            if entry_date_str and entry_date_str != search_date:
+                continue
+
+            try:
+                article = parse_article(entry.link)
+                article_text = article.text or ''
+            except Exception:
+                article = None
+                article_text = ''
+
+            if not is_fdi_latin_america_related(entry.title or '', entry.get('summary', ''), article_text):
+                continue
+
+            news_items.append(
+                build_news_item(
+                    title=entry.title,
+                    url=entry.link,
+                    summary=article_text[:600] if article_text else entry.get('summary', ''),
+                    published=entry.get('published', ''),
+                    source=entry.get('source', {}).get('title', 'Google News'),
+                    text=article_text,
+                )
+            )
+            news_items[-1]['date'] = search_date
+            urls_found.add(entry.link)
+            if len(news_items) >= num_results:
+                break
+            time.sleep(0.5)
+    except Exception as exc:
+        print(f"Error fetching Google News by date: {exc}")
+
     if len(news_items) < num_results:
         try:
-            # Search with date-specific query
-            date_query = f"{base_query} {date_str} OR {target_date.strftime('%B %d, %Y')}"
-            search_query = f"{date_query} site:reuters.com OR site:bloomberg.com OR site:ft.com OR site:wsj.com OR site:bloomberglinea.com"
-            
-            for url in search(search_query, num=min(15, (num_results - len(news_items)) * 2), stop=15):
-                if url not in urls_found and len(news_items) < num_results:
-                    try:
-                        article = Article(url)
-                        article.download()
-                        article.parse()
-                        
-                        # Check if article date matches
-                        article_date_str = None
-                        if article.publish_date:
-                            article_date_str = article.publish_date.strftime('%Y-%m-%d')
-                        
-                        # Include if date matches or if we can't determine (might be relevant)
-                        if article_date_str == date_str or article_date_str is None:
-                            news_items.append({
-                                'title': article.title or 'No title',
-                                'url': url,
-                                'summary': article.text[:500] if article.text else '',
-                                'published': article.publish_date.strftime('%Y-%m-%d') if article.publish_date else date_str,
-                                'source': url.split('/')[2] if '/' in url else 'Unknown',
-                                'date': article_date_str or date_str
-                            })
-                            urls_found.add(url)
-                            time.sleep(1)
-                    except:
-                        pass
-        except Exception as e:
-            print(f"Error in date-specific web search: {e}")
-    
-    return news_items[:num_results]
+            date_query = f"{base_query} {search_date}"
+            fallback_query = (
+                f"{date_query} site:reuters.com OR site:bloomberg.com OR site:ft.com OR site:bloomberglinea.com"
+            )
+            for url in search(fallback_query, num=min(20, num_results * 3), stop=20):
+                if url in urls_found:
+                    continue
 
+                try:
+                    article = parse_article(url)
+                except Exception:
+                    continue
+
+                if not is_fdi_latin_america_related(article.title or '', article.text[:300], article.text):
+                    continue
+
+                news_items.append(
+                    build_news_item(
+                        title=article.title or 'No title',
+                        url=url,
+                        summary=article.text[:600],
+                        published=article.publish_date.strftime('%Y-%m-%d') if article.publish_date else search_date,
+                        source=url.split('/')[2] if '/' in url else 'Unknown',
+                        text=article.text,
+                        origin='web',
+                    )
+                )
+                news_items[-1]['date'] = search_date
+                urls_found.add(url)
+                if len(news_items) >= num_results:
+                    break
+                time.sleep(0.5)
+        except Exception as exc:
+            print(f"Error in date-specific web search: {exc}")
+
+    return news_items[:num_results]
